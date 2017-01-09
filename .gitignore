@@ -1,2 +1,3 @@
 *.swp
 .stack-work
+.DS_Store
