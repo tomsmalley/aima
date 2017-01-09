@@ -38,12 +38,13 @@ instance Ord Position where
 
 makeLenses ''Position
 
--- TODO need to limit positions
+-- | Changes position based on action. Need to check if resultant position is
+-- out of the bounds of the environment.
 updatePosition :: Action -> Position -> Position
-updatePosition Left = over x (subtract 1)
-updatePosition Right = over x (+ 1)
 updatePosition Up = over y (+ 1)
 updatePosition Down = over y (subtract 1)
+updatePosition Left = over x (subtract 1)
+updatePosition Right = over x (+ 1)
 updatePosition _ = id
 
 -- VacuumWorld is just positions and statuses, with vacuum position
@@ -57,33 +58,34 @@ instance TaskEnv VacuumWorld2D Int Percept Action where
     execute (VW2 ps p m) a = case a of
         Suck -> VW2 (M.insert p Clean ps) p m' -- Just clean position
         NoOp -> VW2 ps p m' -- Just update score
-        _    -> VW2 ps (updatePosition a p) (m' - 1) -- Move and update score
+        _    -> VW2 ps p' (m' - 1) -- Move and update score
         where m' = m + sum (f <$> ps) -- Old score plus new score
               f Clean = 1
               f Dirty = 0
+              p' = if M.member (updatePosition a p) ps
+                      then (updatePosition a p)
+                      else p
     measure = vwMeasure
 
 instance (Show m) => Show (VacuumWorld2D m p a) where
     show (VW2 ps p m) = unlines . map (show . map f) . groupBy g $ M.toAscList ps
         where g (pos, _) (pos', _) = _y pos == _y pos'
               f (p', s) = show s ++ if p' == p then " noot" else ""
-    show (VW2 ps p m) = M.foldMapWithKey f ps ++ "score: " ++ show m
-      where f k v = "[ " ++ show k ++ " " ++ show v ++ noot k ++ " ] "
-            noot x = if x == p then " noot" else ""
 
 -- | Initial state generator
 initialWorlds :: [VacuumWorld2D Int Percept Action]
-initialWorlds = undefined--[ squareWorld ]
---initialWorld = undefined--[ VW2 m p 0 | m <- map toMap states, p <- [A, B] ]
-    {-
-    where states = [ (s1, s2) | s1 <- [Clean, Dirty]
-                              , s2 <- [Clean, Dirty] ]
-          toMap (s1, s2) = M.fromList [ (A, s1), (B, s2) ]
-          -}
+initialWorlds = [ squareWorld ]
 
 squareWorld :: VacuumWorld2D Int Percept Action
 squareWorld = VW2 (M.fromList $ map (\x -> (x, Dirty)) positions) (P 0 0) 0
     where positions = [ P x y | x <- [0..4], y <- [0..4] ]
+
+plusWorld :: VacuumWorld2D Int Percept Action
+plusWorld = VW2 (M.fromList $ map (\x -> (x, Dirty)) positions) (P 0 0) 0
+    where positions = [                     P 0 1
+                      , P (-2) 0, P (-1) 0, P 0 0, P 1 0, P 2 0
+                      ,                     P 0 (-1)
+                      ]
 
 ---------------------------
 -- Agent implementations --
